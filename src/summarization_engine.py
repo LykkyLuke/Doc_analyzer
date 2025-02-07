@@ -165,6 +165,28 @@ class SummarizationEngine:
         self.logger.info(f"Starting document summarization (request_id: {request_id})")
         
         try:
+            # Handle empty input
+            if not chunks:
+                error_msg = "No content to summarize"
+                self.logger.error(f"{error_msg} (request_id: {request_id})")
+                return f"Failed to generate summary: {error_msg}"
+            
+            # If there's only one small chunk, summarize it directly
+            if len(chunks) == 1 and len(chunks[0]) < 1000:
+                self.logger.info(f"Single small chunk detected, summarizing directly (request_id: {request_id})")
+                prompt = """
+                Please provide a concise summary of the following text:
+                
+                {text}
+                
+                Summary:
+                """.format(text=chunks[0])
+                
+                summary = self.api_client.generate_content(prompt)
+                if summary:
+                    return summary
+                return "Failed to generate summary: API returned no content"
+            
             # Process chunks and get summaries
             self.logger.debug(f"Processing {len(chunks)} chunks (request_id: {request_id})")
             chunk_summaries = self.process_chunks(chunks)
@@ -173,7 +195,12 @@ class SummarizationEngine:
                 self.logger.error(f"{error_msg} (request_id: {request_id})")
                 return f"Failed to generate summary: {error_msg}"
             
-            # Generate final summary
+            # If we only got one summary, return it directly
+            if len(chunk_summaries) == 1:
+                self.logger.info(f"Single summary generated, returning directly (request_id: {request_id})")
+                return chunk_summaries[0]
+            
+            # Generate final summary from multiple chunk summaries
             self.logger.debug(f"Generating final summary from {len(chunk_summaries)} chunk summaries (request_id: {request_id})")
             final_summary = self.generate_final_summary(chunk_summaries)
             if not final_summary:

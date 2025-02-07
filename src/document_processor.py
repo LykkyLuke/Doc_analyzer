@@ -73,13 +73,41 @@ class DocumentProcessor:
         self.logger.info(f"Creating text chunks (request_id: {request_id})")
         self.logger.debug(f"Input text length: {len(text)} characters")
         
+        # If text is empty, return empty list
+        if not text.strip():
+            self.logger.warning(f"Empty text provided (request_id: {request_id})")
+            return []
+            
         max_size = self.chunk_settings['max_chunk_size']
         overlap = self.chunk_settings['overlap']
         
         try:
-            # Split text into sentences (simple implementation)
-            sentences = [s.strip() for s in text.split('.') if s.strip()]
+            # If text is smaller than max_size, return it as a single chunk
+            if len(text) <= max_size:
+                self.logger.info(
+                    f"Text smaller than max chunk size, returning as single chunk "
+                    f"(request_id: {request_id})"
+                )
+                return [text]
+            
+            # Split text into sentences (improved implementation)
+            sentences = []
+            for line in text.split('\n'):
+                # Split by common sentence endings
+                for sentence in line.replace('!', '.').replace('?', '.').split('.'):
+                    sentence = sentence.strip()
+                    if sentence:
+                        sentences.append(sentence)
+            
             self.logger.debug(f"Number of sentences: {len(sentences)}")
+            
+            # If no sentences found, return text as single chunk
+            if not sentences:
+                self.logger.warning(
+                    f"No sentences found, returning entire text as chunk "
+                    f"(request_id: {request_id})"
+                )
+                return [text]
             
             chunks = []
             current_chunk = []
@@ -88,14 +116,36 @@ class DocumentProcessor:
             for sentence in sentences:
                 sentence_size = len(sentence)
                 
+                # If a single sentence is larger than max_size, split it
+                if sentence_size > max_size:
+                    if current_chunk:
+                        chunk_text = '. '.join(current_chunk) + '.'
+                        chunks.append(chunk_text)
+                    
+                    # Split long sentence into smaller parts
+                    words = sentence.split()
+                    current_part = []
+                    current_part_size = 0
+                    
+                    for word in words:
+                        if current_part_size + len(word) > max_size:
+                            chunks.append(' '.join(current_part))
+                            current_part = []
+                            current_part_size = 0
+                        current_part.append(word)
+                        current_part_size += len(word) + 1
+                    
+                    if current_part:
+                        chunks.append(' '.join(current_part))
+                    
+                    current_chunk = []
+                    current_size = 0
+                    continue
+                
                 if current_size + sentence_size > max_size and current_chunk:
                     # Store current chunk
                     chunk_text = '. '.join(current_chunk) + '.'
                     chunks.append(chunk_text)
-                    self.logger.debug(
-                        f"Chunk created (request_id: {request_id}), "
-                        f"size: {len(chunk_text)} characters"
-                    )
                     
                     # Keep last few sentences for overlap
                     overlap_sentences = current_chunk[-2:] if len(current_chunk) > 2 else current_chunk
@@ -105,13 +155,10 @@ class DocumentProcessor:
                 current_chunk.append(sentence)
                 current_size += sentence_size
             
+            # Add the last chunk if it exists
             if current_chunk:
                 chunk_text = '. '.join(current_chunk) + '.'
                 chunks.append(chunk_text)
-                self.logger.debug(
-                    f"Final chunk created (request_id: {request_id}), "
-                    f"size: {len(chunk_text)} characters"
-                )
             
             self.logger.info(
                 f"Chunking completed (request_id: {request_id}), "

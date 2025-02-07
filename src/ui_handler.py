@@ -113,12 +113,14 @@ class DocumentAnalyzerUI:
     
     def _update_progress(self, current: int, total: int):
         """Update progress bar and status."""
-        progress = (current / total) * 100
-        self.progress_bar["value"] = progress
-        self.status_label.config(
-            text=f"Processing chunk {current} of {total}"
-        )
-        self.window.update_idletasks()
+        def update():
+            progress = (current / total) * 100
+            self.progress_bar["value"] = progress
+            self.status_label.config(
+                text=f"Processing chunk {current} of {total}"
+            )
+            self.window.update_idletasks()
+        self.window.after(0, update)
     
     def _start_analysis(self):
         """Start document analysis in a separate thread."""
