@@ -1,6 +1,6 @@
 # Document Analyzer
 
-A powerful document analysis tool that uses Google's Gemini AI to process and summarize documents intelligently.
+A  document analysis tool that uses Google's Gemini AI to process and summarize documents content in short summary.
 
 ## Table of Contents
 - [Installation](#installation)
